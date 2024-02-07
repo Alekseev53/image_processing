@@ -1,56 +1,71 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
+#include <string>
 
-const int SIZE = 10;
+// Функция для гамма-коррекции трехканального изображения
+cv::Mat applyGammaCorrection(const cv::Mat& img, double gamma) {
+    CV_Assert(img.depth() == CV_8U); // Проверяем, что глубина изображения равна 8 бит на канал
 
-int main() {
-    // Путь к файлу изображения; настройте его в соответствии с вашим окружением
-    std::string imagePath = "../source/2024-02-05 13.47.36.jpg";
-
-    // Загрузка изображения
-    cv::Mat image = cv::imread(imagePath, cv::IMREAD_COLOR);
-
-    if(image.empty()) // Проверка на неудачную загрузку
-    {
-        std::cout << "Could not open or find the image" << std::endl;
-        std::cin.get(); // Ожидание нажатия клавиши
-        return -1;
+    // Создаем LUT для гамма-коррекции
+    cv::Mat lut(1, 256, CV_8UC1);
+    for (int i = 0; i < 256; ++i) {
+        lut.at<uchar>(i) = cv::saturate_cast<uchar>(pow(i / 255.0, gamma) * 255.0);
     }
 
-    // Переворачиваем изображение
-    cv::Mat flippedImage;
-    cv::flip(image, flippedImage, 0);
+    std::vector<cv::Mat> channels;
+    cv::split(img, channels);
 
-    // Инвертируем цвета изображения
-    cv::Mat invertedImage;
-    cv::bitwise_not(flippedImage, invertedImage);
+    // Применяем LUT только к красному каналу
+    cv::LUT(channels[2], lut, channels[2]);
 
-    // Создание шахматной маски того же размера, что и изображение
-    cv::Mat mask = cv::Mat::zeros(invertedImage.rows, invertedImage.cols, CV_8UC1);
-    for(int y = 0; y < mask.rows; ++y) {
-        for(int x = 0; x < mask.cols; ++x) {
-            if((x / SIZE) % 2 == (y / SIZE) % 2) { // Изменение размера клетки можно настроить через делитель
-                mask.at<uchar>(y, x) = 255;
-            }
+    cv::Mat result;
+    cv::merge(channels, result);
+
+    return result;
+}
+
+int main(int argc, char** argv) {
+    // Аргументы командной строки и значения по умолчанию
+    int s = 50, h = 100; // значения по умолчанию
+    double gamma = 2.4;
+    std::string outputFilename = "output.png"; // значение по умолчанию
+
+    // Парсинг аргументов командной строки
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "-s" && i + 1 < argc) {
+            s = std::stoi(argv[++i]);
+        } else if (arg == "-h" && i + 1 < argc) {
+            h = std::stoi(argv[++i]);
+        } else if (arg == "-gamma" && i + 1 < argc) {
+            gamma = std::stod(argv[++i]);
+        } else {
+            outputFilename = arg; // Предполагаем, что не ключевой аргумент — это имя файла
         }
     }
 
-    // Преобразуем маску из одного канала в три канала для соответствия изображению
-    cv::Mat maskColor;
-    cv::cvtColor(mask, maskColor, cv::COLOR_GRAY2BGR);
+    // Создание градиентного изображения от темно-красного до светло-красного
+    int rows = 256 * h / s;
+    cv::Mat img(rows, s, CV_8UC3); // Используем трехканальный тип изображения
 
-    // Применяем маску через побитовое И к инвертированному изображению
-    cv::Mat result;
-    cv::bitwise_and(invertedImage, maskColor, result);
+    for (int i = 0; i < img.rows; ++i) {
+        uchar value = static_cast<uchar>((i / h) * (255.0 / (rows / h - 1)));
+        cv::Vec3b color(value, 0, 0); // Темно-красный до светло-красного: изменяем только красный канал
+        for (int j = 0; j < img.cols; ++j) {
+            img.at<cv::Vec3b>(i, j) = color;
+        }
+    }
 
-    // Создаём окно для отображения
-    cv::namedWindow("Chessboard Masked Image", cv::WINDOW_NORMAL);
+    // Применение гамма-коррекции
+    cv::Mat correctedImg = applyGammaCorrection(img, gamma);
 
-    // Показываем результат в окне
-    cv::imshow("Chessboard Masked Image", result);
-
-    // Ожидание нажатия клавиши
-    cv::waitKey(0);
+    // Вывод изображения на экран или сохранение в файл
+    if (outputFilename.empty()) {
+        cv::imshow("Gradient with Gamma Correction", correctedImg);
+        cv::waitKey(0);
+    } else {
+        cv::imwrite(outputFilename, correctedImg);
+    }
 
     return 0;
 }
