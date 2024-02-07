@@ -49,7 +49,7 @@ int main(int argc, char** argv) {
     cv::Mat img(rows, s, CV_8UC3); // Используем трехканальный тип изображения
 
     for (int i = 0; i < img.rows; ++i) {
-        uchar value = static_cast<uchar>((i / h) * (255.0 / (rows / h - 1)));
+        uchar value = static_cast<uchar>((i * 255.0) / (rows - 1));
         cv::Vec3b color(value, 0, 0); // Темно-красный до светло-красного: изменяем только красный канал
         for (int j = 0; j < img.cols; ++j) {
             img.at<cv::Vec3b>(i, j) = color;
