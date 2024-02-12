@@ -6,31 +6,22 @@
 cv::Mat applyGammaCorrection(const cv::Mat& img, double gamma) {
     CV_Assert(img.depth() == CV_8U); // Проверяем, что глубина изображения равна 8 бит на канал
 
-    // Создаем LUT для гамма-коррекции
     cv::Mat lut(1, 256, CV_8UC1);
     for (int i = 0; i < 256; ++i) {
         lut.at<uchar>(i) = cv::saturate_cast<uchar>(pow(i / 255.0, gamma) * 255.0);
     }
 
-    std::vector<cv::Mat> channels;
-    cv::split(img, channels);
-
-    // Применяем LUT только к красному каналу
-    cv::LUT(channels[2], lut, channels[2]);
-
     cv::Mat result;
-    cv::merge(channels, result);
+    cv::LUT(img, lut, result); // Применяем LUT к изображению
 
     return result;
 }
 
 int main(int argc, char** argv) {
-    // Аргументы командной строки и значения по умолчанию
     int s = 50, h = 100; // значения по умолчанию
     double gamma = 2.4;
     std::string outputFilename = "output.png"; // значение по умолчанию
 
-    // Парсинг аргументов командной строки
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "-s" && i + 1 < argc) {
@@ -40,31 +31,36 @@ int main(int argc, char** argv) {
         } else if (arg == "-gamma" && i + 1 < argc) {
             gamma = std::stod(argv[++i]);
         } else {
-            outputFilename = arg; // Предполагаем, что не ключевой аргумент — это имя файла
+            outputFilename = arg;
         }
     }
 
-    // Создание градиентного изображения от темно-красного до светло-красного
     int rows = 256 * h / s;
-    cv::Mat img(rows, s, CV_8UC3); // Используем трехканальный тип изображения
+    cv::Mat img(rows, s * 2, CV_8UC3); // Создаем изображение в два раза шире
 
+    // Создание градиентной полосы без гамма-коррекции
     for (int i = 0; i < img.rows; ++i) {
         uchar value = static_cast<uchar>((i * 255.0) / (rows - 1));
-        cv::Vec3b color(value, 0, 0); // Темно-красный до светло-красного: изменяем только красный канал
-        for (int j = 0; j < img.cols; ++j) {
+        cv::Vec3b color(value, 0, 0);
+        for (int j = 0; j < img.cols / 2; ++j) { // Заполняем только первую половину ширины
             img.at<cv::Vec3b>(i, j) = color;
         }
     }
 
-    // Применение гамма-коррекции
-    cv::Mat correctedImg = applyGammaCorrection(img, gamma);
+    // Создание градиентной полосы с гамма-коррекцией
+    cv::Mat halfImg = img.colRange(0, s);
+    cv::Mat correctedHalfImg = applyGammaCorrection(halfImg, gamma);
+    correctedHalfImg.copyTo(img.colRange(s, s * 2)); // Копируем обработанную половину во вторую половину ширины исходного изображения
 
-    // Вывод изображения на экран или сохранение в файл
-    if (outputFilename.empty()) {
-        cv::imshow("Gradient with Gamma Correction", correctedImg);
-        cv::waitKey(0);
+     cv::Mat rotatedImg;
+    cv::rotate(img, rotatedImg, cv::ROTATE_90_CLOCKWISE);
+
+    // Сохранение или отображение результата
+    if (!outputFilename.empty()) {
+        cv::imwrite(outputFilename, rotatedImg);
     } else {
-        cv::imwrite(outputFilename, correctedImg);
+        cv::imshow("Gradient Original and Gamma Corrected Rotated", rotatedImg);
+        cv::waitKey(0);
     }
 
     return 0;
