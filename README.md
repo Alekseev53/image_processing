@@ -7,3 +7,4 @@ cmake --build .
 ./misis2024s_21_03_aleseeev_a_r
 
 cmake --build . && ./misis2024s_21_03_aleseeev_a_r
+./misis2024s_21_03_aleseeev_a_r -s 3 -h 40 output_filename.jpg -gamma 5

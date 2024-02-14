@@ -18,7 +18,9 @@ cv::Mat applyGammaCorrection(const cv::Mat& img, double gamma) {
 }
 
 int main(int argc, char** argv) {
-    int s = 50, h = 100; // значения по умолчанию
+    int s = 3, h = 50; // значения по умолчанию
+    s*=10;
+    h*=10;
     double gamma = 2.4;
     std::string outputFilename = "output.png"; // значение по умолчанию
 
@@ -35,15 +37,14 @@ int main(int argc, char** argv) {
         }
     }
 
-    int rows = 256 * h / s;
-    cv::Mat img(rows, s * 2, CV_8UC3); // Создаем изображение в два раза шире
-
+    int rows = 256 * h;
+    bool colorless = false;
+    cv::Mat img(rows, s * 2, CV_8UC1); // Создаем изображение в два раза шире
     // Создание градиентной полосы без гамма-коррекции
     for (int i = 0; i < img.rows; ++i) {
         uchar value = static_cast<uchar>((i * 255.0) / (rows - 1));
-        cv::Vec3b color(value, 0, 0);
         for (int j = 0; j < img.cols / 2; ++j) { // Заполняем только первую половину ширины
-            img.at<cv::Vec3b>(i, j) = color;
+            img.at<uchar>(i, j) = value;
         }
     }
 
@@ -52,14 +53,18 @@ int main(int argc, char** argv) {
     cv::Mat correctedHalfImg = applyGammaCorrection(halfImg, gamma);
     correctedHalfImg.copyTo(img.colRange(s, s * 2)); // Копируем обработанную половину во вторую половину ширины исходного изображения
 
-     cv::Mat rotatedImg;
+    cv::Mat rotatedImg;
     cv::rotate(img, rotatedImg, cv::ROTATE_90_CLOCKWISE);
+
+    // Переворачиваем изображение
+    cv::Mat flippedImage;
+    cv::flip(rotatedImg, flippedImage, 1);
 
     // Сохранение или отображение результата
     if (!outputFilename.empty()) {
-        cv::imwrite(outputFilename, rotatedImg);
+        cv::imwrite(outputFilename, flippedImage);
     } else {
-        cv::imshow("Gradient Original and Gamma Corrected Rotated", rotatedImg);
+        cv::imshow("Gradient Original and Gamma Corrected Rotated", flippedImage);
         cv::waitKey(0);
     }
 
