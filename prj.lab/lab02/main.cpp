@@ -22,22 +22,31 @@ cv::Mat generate_test_image(int side, int inner_square_side, int circle_radius, 
 
 // Function to draw the histogram of brightness
 cv::Mat draw_histogram(const cv::Mat& src) {
-    // Calculate the histogram
-    int histSize = 256;
-    float range[] = { 0, 256 };
+    int histSize = 256; // Количество бинов
+    float range[] = { 0, 256 }; // Диапазон значений
     const float* histRange = { range };
-    bool uniform = true, accumulate = false;
     cv::Mat hist;
-    cv::calcHist(&src, 1, 0, cv::Mat(), hist, 1, &histSize, &histRange, uniform, accumulate);
+    cv::calcHist(&src, 1, 0, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
 
-    // Draw the histogram
+    // Размеры изображения гистограммы
     int hist_w = 256;
-    int hist_h = 230;
+    int hist_h = 256;
     cv::Mat histImage(hist_h, hist_w, CV_8UC1, cv::Scalar(230));
-    cv::normalize(hist, hist, 0, histImage.rows, cv::NORM_MINMAX);
 
+    // Нахождение максимального значения в гистограмме
+    double maxVal = 0;
+    cv::minMaxLoc(hist, 0, &maxVal);
+
+    // Нормализация гистограммы так, чтобы максимальное значение соответствовало 230 пикселям
+    hist = hist * (230.0 / maxVal);
+
+    // Отрисовка гистограммы
     for(int i = 1; i < histSize; i++) {
-        cv::line(histImage, cv::Point(i, hist_h), cv::Point(i, hist_h - cvRound(hist.at<float>(i))), cv::Scalar(0), 1);
+        cv::line(histImage, 
+                 cv::Point(i, hist_h), 
+                 cv::Point(i, hist_h - cvRound(hist.at<float>(i))), 
+                 cv::Scalar(0), 
+                 1);
     }
 
     return histImage;
@@ -70,16 +79,36 @@ cv::Mat add_noise(const cv::Mat& src, double stddev) {
     return clipped_noisy_image;
 }
 
+// Assuming you want to store histogram values and some other integer data together
+void extractHistogramValues(std::vector<std::pair<std::vector<float>, std::vector<int>>>& histValuesVec,cv::Mat& src, std::vector<int> relatedData) {
+    int histSize = 256; // Number of bins
+    float range[] = { 0, 256 }; // Range of values
+    const float* histRange = { range };
+    cv::Mat hist;
+    cv::calcHist(&src, 1, 0, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
+
+    std::vector<float> histValues(histSize);
+
+    for (int i = 0; i < histSize; ++i) {
+        histValues[i] = hist.at<float>(i);
+        // Populate relatedData[i] as needed
+    }
+
+    // Store the pair of vectors in the provided vector of pairs
+    histValuesVec.push_back(std::make_pair(histValues, relatedData));
+}
+
 int main() {
     int side = 256;
     int inner_square_side = 209;
     int circle_radius = 83;
 
     // Brightness levels for test images
-    std::vector<cv::Scalar> levels = {
-        cv::Scalar(0),   // Outer square
-        cv::Scalar(127), // Inner square
-        cv::Scalar(255)  // Circle
+    std::vector<std::vector<uchar>> levels = {
+        {0, 127, 255},
+        {20, 127, 235},
+        {55, 127, 200},
+        {90, 127, 165}
     };
 
     // Standard deviation values for noise
@@ -88,9 +117,7 @@ int main() {
     // Generate test images and histograms
     std::vector<cv::Mat> test_images;
     for(const auto& level : levels) {
-        std::vector<uchar> level1 = {30, 127, 220}; // Black, Gray, White for circle, inner square, and outer square respectively.
-        cv::Mat image = generate_test_image(side, inner_square_side, circle_radius, level1);
-
+        cv::Mat image = generate_test_image(side, inner_square_side, circle_radius, level);
         test_images.push_back(image);
     }
 
@@ -120,6 +147,31 @@ int main() {
     cv::Mat final_image = test_image_row;
     for (auto& noisy_row : all_noisy_images_with_histograms) {
         cv::vconcat(final_image, noisy_row, final_image);
+    }
+
+    // Vector to store histogram values for all images
+    std::vector<std::pair<std::vector<float>,std::vector<int>>> all_histogram_values;
+    // Process and store histograms for original and noisy images
+    int i_k = 0;
+    for (auto& image : test_images) {
+        //(levels[i][0]+levels[i][1])/2.0;//,levels[i][2],
+        extractHistogramValues(all_histogram_values, image,{0,0,0}); // For original images
+        int j_k = 0;
+        for (double stddev : stddev_values) {
+            cv::Mat noisy_image = add_noise(image, stddev);
+            extractHistogramValues(all_histogram_values, noisy_image,{0,0,0}); // For noisy images
+            j_k += 1;
+        }
+        i_k += 1;
+    }
+
+    // Optionally print histogram values for each image
+    for (size_t i = 0; i < all_histogram_values.size(); ++i) {
+        std::cout << "Histogram for image " << i << ":" << std::endl;
+        for (size_t j = 0; j < all_histogram_values[i].first.size(); ++j) {
+            std::cout << all_histogram_values[i].first[j] << (j < all_histogram_values[i].first.size() - 1 ? ", " : "\n");
+        }
+        std::cout << std::endl;
     }
 
     // Show and save the final image
