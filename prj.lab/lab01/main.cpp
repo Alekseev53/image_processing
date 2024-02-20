@@ -39,7 +39,7 @@ int main(int argc, char** argv) {
 
     int rows = 256 * h;
     bool colorless = false;
-    cv::Mat img(rows, s * 2, CV_8UC1); // Создаем изображение в два раза шире
+    cv::Mat img(rows, s * 2, CV_8UC1); // Создаем изображение в два раза ширеp
     // Создание градиентной полосы без гамма-коррекции
     for (int i = 0; i < img.rows; ++i) {
         uchar value = static_cast<uchar>((i * 255.0) / (rows - 1));
