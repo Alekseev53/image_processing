@@ -67,9 +67,23 @@ cv::Mat draw_histogram(const cv::Mat& src) {
     return histArray[0];
 }
 
-int main() {
+int main(int argc, char** argv) {
+
+    double q_b = 0.1, q_w = 0.1; // значения по умолчанию
+    std::string inputFilename = "x.jpeg"; // значение по умолчанию
+
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "-q_b" && i + 1 < argc) {
+            q_b = std::stoi(argv[++i]);
+        } else if (arg == "-q_w" && i + 1 < argc) {
+            q_w = std::stoi(argv[++i]);
+        } else {
+            inputFilename = arg;
+        }
+    }
     // Чтение изображения
-    cv::Mat image = cv::imread("x.jpeg");
+    cv::Mat image = cv::imread(inputFilename);
     if (image.empty()) {
         std::cout << "Could not open or find the image" << std::endl;
         return -1;
@@ -81,9 +95,6 @@ int main() {
     cv::split(image, channels);
 
     // Параметры квантилей для автоконтрастирования
-    double all = 0.1;
-    double q_b = all; // Нижний квантиль
-    double q_w = all; // Верхний квантиль
     q_w = 1-q_w; // Верхний квантиль
 
     std::vector<cv::Mat> histograms;
