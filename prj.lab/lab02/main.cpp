@@ -57,6 +57,12 @@ cv::Mat draw_histogram(const cv::Mat& src) {
     cv::Mat hist;
     cv::calcHist(&src, 1, 0, cv::Mat(), hist, 1, &histSize, &histRange, true, false);
 
+    // Преобразование cv::Mat гистограммы в std::vector<float>
+    std::vector<float> hist_values(histSize);
+    for (int i = 0; i < histSize; ++i) {
+        hist_values[i] = hist.at<float>(i);
+    }
+
     // Размеры изображения гистограммы
     int hist_w = 256;
     int hist_h = 256;
@@ -76,6 +82,19 @@ cv::Mat draw_histogram(const cv::Mat& src) {
                  cv::Point(i, hist_h - cvRound(hist.at<float>(i))), 
                  cv::Scalar(0), 
                  1);
+    }
+
+    // Разбиваем гистограмму на три части и вычисляем средний индекс для каждой части
+    size_t part_size = histSize / 3;
+    for (int part = 0; part < 3; ++part) {
+        auto start_iter = hist_values.begin() + part * part_size;
+        auto end_iter = (part < 2) ? start_iter + part_size : hist_values.end();
+        std::vector<float> part_values(start_iter, end_iter);
+        double mean_index = mean_index_of_vector(part_values);
+
+        // Отрисовка линии среднего индекса для каждой части
+        int line_position = cvRound(mean_index + part * part_size);
+        cv::line(histImage, cv::Point(line_position, 0), cv::Point(line_position, hist_h), cv::Scalar(0), 2);
     }
 
     return histImage;
@@ -160,7 +179,7 @@ int main() {
         std::vector<cv::Mat> noisy_images_with_histograms;
         for(auto& image : test_images) {
             cv::Mat noisy_image = add_noise(image, stddev);
-            cv::Mat histogram = draw_histogram(noisy_image);
+            cv::Mat histogram = draw_histogram(noisy_image); // Отрисовка гистограммы со средним индексом
             cv::Mat combined_image;
             cv::vconcat(noisy_image, histogram, combined_image);
             noisy_images_with_histograms.push_back(combined_image);
