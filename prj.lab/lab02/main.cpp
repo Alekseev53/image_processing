@@ -1,6 +1,35 @@
 #include <opencv2/opencv.hpp>
 #include <vector>
 #include <random>
+#include <numeric>
+
+// Функция для вычисления среднего значения вектора
+double mean_of_vector(const std::vector<float>& values) {
+    return std::accumulate(values.begin(), values.end(), 0.0) / values.size();
+}
+
+// Функция для вычисления дисперсии вектора
+double variance_of_vector(const std::vector<float>& values, double mean) {
+    double variance = 0.0;
+    for (auto value : values) {
+        variance += (value - mean) * (value - mean);
+    }
+    variance /= values.size();
+    return variance;
+}
+
+// Функция для вычисления среднего индекса вектора
+double mean_index_of_vector(const std::vector<float>& values) {
+    double sum = 0.0;
+    double weight_sum = 0.0;
+    for (size_t i = 0; i < values.size(); ++i) {
+        sum += i * values[i];
+        weight_sum += values[i];
+    }
+    return weight_sum > 0 ? sum / weight_sum : 0;
+}
+
+
 
 // Function to generate the test image with three levels of brightness
 cv::Mat generate_test_image(int side, int inner_square_side, int circle_radius, const std::vector<uchar>& levels) {
@@ -174,6 +203,28 @@ int main() {
         std::cout << std::endl;
     }
 
+    // Теперь для каждого массива гистограммных значений...
+    for (size_t i = 0; i < all_histogram_values.size(); ++i) {
+        const auto& histogram_values = all_histogram_values[i].first;
+        size_t part_size = histogram_values.size() / 3;
+
+        // Разбиваем на три части и вычисляем среднее и дисперсию для каждой части
+        for (int part = 0; part < 3; ++part) {
+            // Вычисляем границы для части
+            auto start_iter = histogram_values.begin() + part * part_size;
+            auto end_iter = (part < 2) ? start_iter + part_size : histogram_values.end();
+            
+            // Считаем среднее для части
+            std::vector<float> part_values(start_iter, end_iter);
+            double mean_index = mean_index_of_vector(part_values)+part * part_size;
+            // Считаем дисперсию для части
+            double variance = variance_of_vector(part_values, mean_of_vector(part_values));
+
+            // Выводим среднее и дисперсию для каждой части
+            std::cout << "Image " << i << " - Part " << part << " - Mean: " << mean_index << ", Variance: " << variance << std::endl;
+        }
+    }
+
     // Show and save the final image
     cv::imshow("Test Image with Histograms and Noise", final_image);
     cv::waitKey(0);
@@ -181,4 +232,3 @@ int main() {
 
     return 0;
 }
-
